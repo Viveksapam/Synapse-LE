@@ -78,45 +78,11 @@ backend/
 
 ### 4.1 Route Handler Rule
 
-Route handlers are responsible for exactly three things: parsing the request,
-calling a service function, and returning the response. All business logic
-belongs in `services/`.
-
-```python
-# CORRECT — thin route handler
-@router.post("/orders", response_model=OrderResponse)
-def create_order(
-    order: OrderCreate,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """
-    Create a new order for the authenticated user.
-
-    Args:
-        order: Validated order payload from the request body.
-        db: Injected database session.
-        current_user: Authenticated user from JWT dependency.
-
-    Returns:
-        The newly created order record.
-    """
-    return order_service.create_order(db=db, order=order, user_id=current_user.id)
-```
+Route handlers: parse request → call service → return response. No business logic.
 
 ### 4.2 Authentication
 
-All protected endpoints use the `get_current_user` FastAPI dependency.
-No route handler checks auth manually.
-
-```python
-# CORRECT
-from app.dependencies import get_current_user
-
-@router.get("/profile")
-def get_profile(current_user: User = Depends(get_current_user)):
-    return current_user
-```
+All protected endpoints use `get_current_user` dependency. No manual auth checks.
 
 ---
 
@@ -299,47 +265,11 @@ Test files mirror the source hierarchy and live in `tests/`:
 
 ### 9.4 Database Session Mocking
 
-Use a pytest fixture providing an isolated SQLite in-memory session backed by an
-active transaction that rolls back automatically after each test.
-
-```python
-# tests/conftest.py
-import pytest
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from app.database import Base
-from app.dependencies import get_db
-from app.main import app
-
-SQLALCHEMY_TEST_URL = "sqlite:///:memory:"
-
-@pytest.fixture()
-def db_session():
-    engine = create_engine(SQLALCHEMY_TEST_URL, connect_args={"check_same_thread": False})
-    Base.metadata.create_all(bind=engine)
-    TestingSessionLocal = sessionmaker(bind=engine)
-    session = TestingSessionLocal()
-    try:
-        yield session
-    finally:
-        session.rollback()
-        session.close()
-        Base.metadata.drop_all(bind=engine)
-
-@pytest.fixture()
-def client(db_session):
-    def override_get_db():
-        yield db_session
-    app.dependency_overrides[get_db] = override_get_db
-    from fastapi.testclient import TestClient
-    yield TestClient(app)
-    app.dependency_overrides.clear()
-```
+Use pytest fixture with in-memory SQLite. Auto-rollback after each test. See ADR-testing for full setup.
 
 ### 9.5 External Mocking
 
-Mock all external HTTP calls using `responses` or `unittest.mock`.
-No network calls are permitted during test execution.
+Mock all external HTTP calls using `responses` or `unittest.mock`. No network calls in tests.
 
 ---
 
@@ -436,98 +366,23 @@ both harder to review and harder to revert.
 
 ## 14. Migration Debt — Django → FastAPI
 
-The Django-to-FastAPI migration creates specific categories of residual debt.
-Each must be actively hunted and eliminated.
+Delete all Django artifacts on sight: `settings.py`, `urls.py`, `views.py`, `forms.py`, `admin.py`, `manage.py`, `serializers.py`, DRF permission classes.
 
-### 14.1 Dead Django Artifacts
-
-The following are Django-specific and have no place in a FastAPI codebase.
-Delete them on sight — do not comment them out.
-
-| Artifact | Why It Must Go |
-|---|---|
-| `settings.py` / `django.conf` imports | Django configuration system; replaced by `.env` + pydantic-settings |
-| `urls.py` files | Django URL routing; replaced by FastAPI routers |
-| `views.py` files | Django view layer; replaced by FastAPI route handlers |
-| `forms.py` files | Django form validation; replaced by Pydantic schemas |
-| `admin.py` files | Django admin registration; no FastAPI equivalent |
-| `apps.py` / `AppConfig` classes | Django app registry; not applicable |
-| `migrations/` folders from Django | Django migration history; Alembic manages this now |
-| `manage.py` | Django management script; not applicable |
-| `serializers.py` files | DRF serialisers; replaced by Pydantic schemas |
-| `permissions.py` (DRF-style) | DRF permission classes; replaced by FastAPI dependencies |
-| Django middleware classes | Replaced by FastAPI middleware / Starlette middleware |
-| `INSTALLED_APPS`, `DATABASES` dict configs | Django settings keys; replaced by `.env` + SQLAlchemy URL |
-
-**Run these checks now — any file returned requires immediate triage:**
-
-```bash
-grep -r "from django" backend/ --include="*.py" -l
-grep -r "import django" backend/ --include="*.py" -l
-grep -r "rest_framework" backend/ --include="*.py" -l
-grep -r "login_required\|request\.user\|authenticate(" backend/ --include="*.py"
-```
+**Audit**: `grep -r "from django\|import django\|rest_framework" backend/ --include="*.py"`
 
 ### 14.2 ORM Pattern Conflicts
 
-Code ported from Django often carries Django ORM assumptions that break or
-silently misbehave under SQLAlchemy.
-
-```python
-# WRONG — Django ORM patterns; must not exist in this codebase
-User.objects.filter(is_active=True)
-User.objects.create(username="test")
-instance.save()
-MyModel.objects.all().delete()
-
-# CORRECT — SQLAlchemy equivalents
-db.query(User).filter(User.bool_is_active == True).all()
-db.add(User(str_username="test")); db.commit()
-db.add(instance); db.commit(); db.refresh(instance)
-db.query(MyModel).delete(); db.commit()
-```
-
-Signal/receiver patterns (`post_save`, `pre_delete`) have no direct SQLAlchemy
-equivalent. If found, replace with explicit service-layer calls or documented
-SQLAlchemy event listeners.
+No Django ORM patterns (`User.objects.filter()`, `instance.save()`). Use SQLAlchemy exclusively.
+Replace signal/receiver patterns with explicit service-layer calls.
 
 ### 14.3 Authentication Migration
 
-Django session-based auth must be fully replaced by FastAPI JWT dependency injection.
-
-```python
-# WRONG — Django residue
-from django.contrib.auth.decorators import login_required
-@login_required
-def get_profile(request):
-    return request.user
-
-# CORRECT — FastAPI pattern
-from app.dependencies import get_current_user
-@router.get("/profile")
-def get_profile(current_user: User = Depends(get_current_user)):
-    return current_user
-```
+No Django session auth. Use FastAPI JWT dependency injection everywhere.
 
 ### 14.4 Requirements Cleanup
 
-The following packages must not appear in `requirements.txt` post-migration.
-Their presence indicates incomplete migration.
-
-```
-Django
-djangorestframework
-django-cors-headers        ← replaced by fastapi.middleware.cors
-django-environ             ← replaced by python-dotenv or pydantic-settings
-django-filter              ← replaced by query parameter handling in FastAPI
-whitenoise                 ← static file serving handled differently
-```
-
-**Verify after cleanup:**
-```bash
-pip install -r requirements.txt   # must succeed cleanly
-pip check                         # must report no conflicts
-```
+Ban these packages: Django, djangorestframework, django-cors-headers, django-environ, django-filter, whitenoise.
+Verify: `pip install -r requirements.txt && pip check`
 
 ---
 
@@ -556,38 +411,11 @@ it is retrieved from git history.
 
 ### 15.2 No Magic Numbers or Strings
 
-Any literal value that is not immediately self-evident must be a named constant.
-
-```python
-# WRONG
-if num_failed_attempts > 5:
-    lock_account()
-
-# CORRECT
-MAX_FAILED_LOGIN_ATTEMPTS = 5
-if num_failed_attempts > MAX_FAILED_LOGIN_ATTEMPTS:
-    lock_account()
-```
+All non-obvious literals must be named constants. Example: `MAX_FAILED_LOGIN_ATTEMPTS = 5`.
 
 ### 15.3 No Business Logic in Route Handlers
 
-Route handlers must only: parse input, call a service, return the result.
-
-```python
-# WRONG — business logic inside route handler
-@router.post("/orders")
-def create_order(order: OrderCreate, db: Session = Depends(get_db)):
-    inventory = db.query(Inventory).filter(...).first()
-    if inventory.num_stock < order.num_quantity:
-        raise HTTPException(status_code=400, detail="Insufficient stock")
-    inventory.num_stock -= order.num_quantity
-    db.commit()
-
-# CORRECT
-@router.post("/orders")
-def create_order(order: OrderCreate, db: Session = Depends(get_db)):
-    return order_service.create_order(db=db, order=order)
-```
+Route handlers: parse input, call service, return result only. Delegate all logic to services.
 
 ### 15.4 Single Source of Truth for Schemas
 
@@ -596,15 +424,7 @@ in both a schema file and inline inside a route handler or service.
 
 ### 15.5 Consistent Error Response Shape
 
-Every `HTTPException` uses the standard envelope (§7.1). No DRF-style residue.
-
-```python
-# WRONG — DRF residue
-raise HTTPException(status_code=400, detail={"non_field_errors": ["Invalid data"]})
-
-# CORRECT
-raise HTTPException(status_code=400, detail="Invalid order quantity. Must be greater than zero.")
-```
+All `HTTPException` use standard envelope (§7.1). No DRF-style residue like `{"non_field_errors": [...]}`.
 
 ### 15.6 No Duplicate API Endpoints
 
@@ -619,18 +439,7 @@ Any path printed by this command is a conflict. Resolve before merging.
 
 ### 15.7 No print() in Production Paths
 
-`print()` is a development tool. Remove all instances before committing.
-Use structured logging (`logging` module) for production-grade output.
-
-```python
-# WRONG
-print(f"User {str_user_id} logged in")
-
-# CORRECT
-import logging
-logger = logging.getLogger(__name__)
-logger.info("User %s authenticated successfully", str_user_id)
-```
+Remove all `print()` before committing. Use `logging` module instead.
 
 ---
 

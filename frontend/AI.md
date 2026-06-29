@@ -61,13 +61,7 @@ frontend/src/
 
 ### 3.4 Code Splitting
 
-- Route-level splitting required via `React.lazy` + `Suspense`.
-- Each page folder loads lazily from the router.
-
-```jsx
-// router entry — correct
-const ProductPage = React.lazy(() => import('./pages/ProductPage/ProductPage'));
-```
+Route-level splitting required: `React.lazy()` + `Suspense` for each page folder.
 
 ---
 
@@ -267,47 +261,23 @@ test('ProductCard has no accessibility violations', async () => {
 
 | Layer | Target | Scope |
 |---|---|---|
-| Unit | ≥ 80% line coverage | `src/utils/`, `src/hooks/` |
-| Integration | Key user flows covered | Page-level happy path + primary error path |
-| E2E | Critical journeys covered | Auth, primary conversion flow, error recovery |
-| Accessibility | Zero violations | All rendered components |
+| Unit | ≥ 80% | `src/utils/`, `src/hooks/` |
+| Integration | Key flows | Page-level happy path + error path |
+| E2E | Critical journeys | Auth, conversion, error recovery |
+| Accessibility | Zero violations | All components |
 
 ### 9.3 Test Placement
 
-- Test files are co-located adjacent to source: `ProductCard.test.jsx` beside `ProductCard.jsx`.
-- E2E tests live in `e2e/` at the project root.
+Co-locate tests: `ProductCard.test.jsx` beside `ProductCard.jsx`. E2E tests in `e2e/`.
 
 ### 9.4 Mocking Policy
 
-- Mock at the **network layer** using MSW (`msw`) — not by mocking `fetch` directly.
-- Mock `src/api/` functions in integration tests only when MSW is insufficient.
-- Never mock the component under test.
+Mock at network layer with MSW. Never mock component under test.
 
 ### 9.5 What to Test
 
-**Test:**
-- Business-critical user flows (auth, purchase, form submission).
-- Error states and recovery paths.
-- All shared hooks (loading, error, data states).
-- All utility functions, including edge cases (empty input, null, boundary values).
-- Accessibility of all shared components.
-
-**Do not test:**
-- React internals or framework behaviour.
-- Trivial pass-through props.
-- One-off page-specific layout components with no logic.
-
-### 9.6 E2E with Playwright
-
-```js
-// e2e/checkout.spec.js — example structure
-test('user can complete checkout', async ({ page }) => {
-  await page.goto('/products');
-  await page.getByRole('button', { name: 'Add to cart' }).first().click();
-  await page.getByRole('link', { name: 'Checkout' }).click();
-  await expect(page.getByRole('heading', { name: 'Order confirmed' })).toBeVisible();
-});
-```
+Test: business flows, error states, hooks, utils + edge cases, component a11y.
+Skip: React internals, trivial pass-through props.
 
 ---
 
@@ -491,17 +461,7 @@ are among the largest files in the repository. Delete them as soon as they are s
 
 ### 16.4 Dead Components
 
-Any component in `src/components/` not imported by any active page or other component is dead.
-
-```bash
-for f in src/components/**/*.jsx; do
-  name=$(basename "$f" .jsx)
-  count=$(grep -r "$name" src/ --include="*.jsx" --include="*.js" | grep -v "$f" | wc -l)
-  if [ "$count" -eq 0 ]; then echo "DEAD: $f"; fi
-done
-```
-
-Run before any significant release. Delete what this script reports.
+Any component in `src/components/` not imported elsewhere is dead. Delete on sight.
 
 ### 16.5 Duplicate Utility Functions
 
@@ -534,32 +494,11 @@ Commented-out code is prohibited in any committed file.
 
 ### 17.2 No Magic Numbers or Strings
 
-Any literal value that is not immediately self-evident must be a named constant in `config.js`.
-
-```js
-// WRONG
-setTimeout(handleAutoLogout, 1800000);
-
-// CORRECT — src/api/config.js
-export const NUM_SESSION_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
-```
+All non-obvious literals must be named constants in `config.js`.
 
 ### 17.3 No Business Logic in Components
 
-React components render UI and handle user events. Data transformation, formatting,
-and decision logic belong in `src/utils/` or custom hooks.
-
-```jsx
-// WRONG — logic inside JSX
-<p>{product.numPrice > 1000
-  ? `${(product.numPrice / 100).toFixed(2)} (bulk rate)`
-  : `${product.numPrice.toFixed(2)}`}
-</p>
-
-// CORRECT
-import { formatProductPrice } from '../utils/formatters';
-<p>{formatProductPrice(product.numPrice)}</p>
-```
+Components render and handle events only. Move data transform, formatting, decisions to `src/utils/` or hooks.
 
 ### 17.4 Single Source of Truth for Prop Shapes
 
@@ -584,9 +523,7 @@ zero warnings policy in CI means they are blocked from merging.
 
 ### 17.6 No console.log in Production Paths
 
-`console.log`, `console.warn`, and `console.error` are development tools.
-Remove all of them before committing. Use the error monitoring service for
-production-grade logging.
+Remove all `console.log`, `console.warn`, `console.error` before committing. Use error monitoring service.
 
 ---
 
@@ -642,3 +579,21 @@ A task is only done when all of the following are true:
 - [ ] No magic numbers or strings — all literals are named constants.
 - [ ] Old page / component / asset deleted if replaced by this PR.
 - [ ] CI pipeline is fully green (lint → audit → test → build → Lighthouse → E2E).
+
+Analyze my codebase and create a markdown summary. Here are the stats:
+
+**Codebase Statistics:**
+- Total lines of code: 11,920 (JS/JSX/TS/TSX)
+- Total size: 486.96 MB
+- JavaScript files: 7,927
+- TypeScript/TSX files: 3
+- Location: C:\Users\Vivek\projects\sle
+
+Create a markdown file (.md) that includes:
+1. **Codebase Overview** - Brief description of the project scope based on these numbers
+2. **Size Breakdown** - Visual representation of the stats (you can use a simple table or formatted text)
+3. **Model Recommendation** - Which Claude model to use for different tasks (Haiku for small edits, Sonnet for complex work)
+4. **Command Reference** - The PowerShell commands I can reuse to check codebase size monthly
+5. **Tracking** - A template for logging codebase growth over time
+
+Make it scannable and practical—something I can reference quickly.
