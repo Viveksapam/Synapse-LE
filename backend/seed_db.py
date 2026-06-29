@@ -201,6 +201,24 @@ ARR_BLOGS = [
         "strContent": "A field guide to the small, unglamorous mechanics — source attachment, claim linking, reaction integrity — that decide whether a community rewards sources or noise.",
         "strThemeColor": "#3b82f6",
     },
+    {
+        "strTitle": "The Ethics of Algorithmic Curation",
+        "strSummary": "When feeds decide what is seen, who bears responsibility for what is believed?",
+        "strContent": "Curation is never neutral. This post traces the accountability chain from ranking signal to reader belief — and asks what ethical obligations platform designers carry.",
+        "strThemeColor": "#10b981",
+    },
+    {
+        "strTitle": "Credential Portability and the Open Learner Record",
+        "strSummary": "Why learning achievements locked inside institutional silos undermine the value they claim to confer.",
+        "strContent": "A credential that cannot travel is half a credential. We examine open standards — Open Badges, CLR, Verifiable Credentials — and what adoption actually requires from institutions.",
+        "strThemeColor": "#3b82f6",
+    },
+    {
+        "strTitle": "Source Attachment as a Social Norm",
+        "strSummary": "Moving citation from academic obligation to everyday discourse habit.",
+        "strContent": "Citation is not gatekeeping — it is a gift to the reader. This piece looks at how platform design can nudge users toward source attachment without making it feel like homework.",
+        "strThemeColor": "#10b981",
+    },
 ]
 
 

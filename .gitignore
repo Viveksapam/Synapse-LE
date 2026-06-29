@@ -203,6 +203,9 @@ cython_debug/
 # Temporary file for partial code execution
 tempCodeRunnerFile.py
 
+# Private instruction logs (not for repo)
+docs/.private/
+
 # Ruff stuff:
 .ruff_cache/
 
@@ -216,3 +219,7 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Project directories
+src/projects/classroom
+src/projects/synapse_assessments

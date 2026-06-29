@@ -1,0 +1,130 @@
+import React, { useState, useEffect } from 'react';
+import PropTypes from 'prop-types';
+import { Link } from 'react-router-dom';
+import { ChevronDown } from 'lucide-react';
+
+const TopNavBar = ({ boolIsLoggedInState, onOpenLogin, handleLogout }) => {
+  const [boolIsDarkModeState, setBoolIsDarkMode] = useState(false);
+
+  useEffect(() => {
+    const savedMode = localStorage.getItem('ath-dark-mode');
+    const isDark = savedMode === 'true' || false;
+    setBoolIsDarkMode(isDark);
+    applyDarkMode(isDark);
+  }, []);
+
+  const applyDarkMode = (isDark) => {
+    if (isDark) {
+      document.documentElement.classList.add('ath-dark-mode');
+    } else {
+      document.documentElement.classList.remove('ath-dark-mode');
+    }
+  };
+
+  const handleDarkModeToggle = () => {
+    const newMode = !boolIsDarkModeState;
+    setBoolIsDarkMode(newMode);
+    localStorage.setItem('ath-dark-mode', newMode);
+    applyDarkMode(newMode);
+  };
+
+  return (
+    <header className="ath-header">
+      <nav className="ath-nav">
+        <div className="ath-brand-group">
+          <Link to="/" className="ath-brand">
+            Synapse LE
+          </Link>
+          <ul className="ath-nav-links hidden-mobile">
+            <Link className="ath-nav-link" to="/verisphere">
+              Verisphere
+            </Link>
+            <a 
+              className="ath-nav-link" 
+              href="#video"
+              onClick={(e) => {
+                e.preventDefault();
+                document.getElementById('video')?.scrollIntoView({ behavior: 'smooth' });
+              }}
+            >
+              Spotlight
+            </a>
+            <a 
+              className="ath-nav-link" 
+              href="#merchandise"
+              onClick={(e) => {
+                e.preventDefault();
+                document.getElementById('merchandise')?.scrollIntoView({ behavior: 'smooth' });
+              }}
+            >
+              Merchandise
+            </a>
+          </ul>
+        </div>
+        
+        <div className="ath-nav-actions">
+          <button
+            onClick={handleDarkModeToggle}
+            className="ath-dark-mode-toggle"
+            title={boolIsDarkModeState ? 'Light mode' : 'Dark mode'}
+            aria-label={boolIsDarkModeState ? 'Light mode' : 'Dark mode'}
+          >
+            {boolIsDarkModeState ? 'LIGHT' : 'DARK'}
+          </button>
+
+          <div className="ath-dropdown-container">
+            <button className="ath-dropdown-trigger">
+              RELEASES <ChevronDown size={12} style={{ marginLeft: '4px' }} />
+            </button>
+            <div className="ath-dropdown-menu">
+              <div className="ath-dropdown-column">
+                <h4>Home Designs</h4>
+                <a href="/" className="ath-nav-link">Classic</a>
+                <a href="/home-templates/SynapseHome-Editorial.dc.html" target="_blank" rel="noreferrer">Editorial [disconnected]</a>
+                <a href="/home-templates/SynapseHome-Minimal.dc.html" target="_blank" rel="noreferrer">Minimal [disconnected]</a>
+              </div>
+              <div className="ath-dropdown-column">
+                <h4>Verisphere</h4>
+                <Link to="/verisphere">Verisphere Main</Link>
+              </div>
+              <div className="ath-dropdown-column">
+                <h4>E-Commerce</h4>
+                <Link to="/shop">Shop Page</Link>
+              </div>
+              <div className="ath-dropdown-column">
+                <h4>Learning</h4>
+                <Link to="/credentials">Credentials (CAS)</Link>
+                <Link to="/assessment">Assessment Hub</Link>
+                <Link to="/sle">Classroom Map</Link>
+              </div>
+            </div>
+          </div>
+
+          {boolIsLoggedInState ? (
+            <button 
+              onClick={handleLogout}
+              className="ath-btn-login"
+            >
+              LOG OUT
+            </button>
+          ) : (
+            <button 
+              onClick={onOpenLogin}
+              className="ath-btn-login"
+            >
+              LOG IN
+            </button>
+          )}
+        </div>
+      </nav>
+    </header>
+  );
+};
+
+TopNavBar.propTypes = {
+  boolIsLoggedInState: PropTypes.bool,
+  onOpenLogin: PropTypes.func.isRequired,
+  handleLogout: PropTypes.func.isRequired
+};
+
+export default TopNavBar;

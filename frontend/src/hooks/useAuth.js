@@ -1,50 +1,52 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { loginUser, registerUser, fetchUserProfile } from '../api/userApi';
 
+const TOKEN_KEY = 'access_token';
+
+const readToken = () => {
+  try { return sessionStorage.getItem(TOKEN_KEY); }
+  catch { return null; }
+};
+
+const writeToken = (strToken) => {
+  try { strToken ? sessionStorage.setItem(TOKEN_KEY, strToken) : sessionStorage.removeItem(TOKEN_KEY); }
+  catch { /* storage unavailable */ }
+};
+
 export const useAuth = () => {
-  const [strTokenState, setStrTokenState] = useState(() => localStorage.getItem('access_token'));
-  const [boolIsLoggedInState, setBoolIsLoggedInState] = useState(!!strTokenState);
+  const [strTokenState, setStrTokenState] = useState(readToken);
+  const [boolIsLoggedInState, setBoolIsLoggedInState] = useState(!!readToken());
   const [objUserState, setObjUserState] = useState(null);
 
-  useEffect(() => {
-    setBoolIsLoggedInState(!!strTokenState);
-    if (strTokenState) {
-      localStorage.setItem('access_token', strTokenState);
-      fetchUserProfile(strTokenState).then(user => {
-        setObjUserState(user);
-      }).catch(() => {
-        // Token invalid or expired
-        handleLogout();
-      });
-    } else {
-      localStorage.removeItem('access_token');
-      setObjUserState(null);
-    }
-  }, [strTokenState]);
+  const handleLogout = useCallback(() => {
+    setStrTokenState(null);
+    setObjUserState(null);
+    writeToken(null);
+    setBoolIsLoggedInState(false);
+  }, []);
 
-  const handleLogin = async (username, password) => {
-    const data = await loginUser(username, password);
+  useEffect(() => {
+    const boolHasToken = !!strTokenState;
+    setBoolIsLoggedInState(boolHasToken);
+    writeToken(strTokenState);
+    if (!boolHasToken) { setObjUserState(null); return; }
+    fetchUserProfile(strTokenState)
+      .then(setObjUserState)
+      .catch(handleLogout);
+  }, [strTokenState, handleLogout]);
+
+  const handleLogin = async (strUsername, strPassword) => {
+    const data = await loginUser(strUsername, strPassword);
     setStrTokenState(data.access_token);
     return data;
   };
 
-  const handleRegister = async (userData) => {
-    const data = await registerUser(userData);
-    return data;
-  };
-
-  const handleLogout = () => {
-    setStrTokenState(null);
+  const handleRegister = async (objUserData) => {
+    return await registerUser(objUserData);
   };
 
   return {
-    strTokenState,
-    boolIsLoggedInState,
-    objUserState,
-    setObjUserState,
-    handleLogin,
-    handleRegister,
-    handleLogout
+    strTokenState, boolIsLoggedInState, objUserState,
+    setObjUserState, handleLogin, handleRegister, handleLogout,
   };
 };
-

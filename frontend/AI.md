@@ -1,16 +1,25 @@
-# Frontend — React System Specification
+# Frontend — System Specification
+
+**Authoritative reference for all frontend code in this repository.**
+This file governs both human contributors and AI agents. Every rule here is enforced — not aspirational.
 
 ---
 
-## 1. Stack & Core Constraints
+## 1. Stack
 
-| Concern | Choice | Rationale |
+| Concern | Choice | Note |
 |---|---|---|
-| Framework | React (JavaScript) | No TypeScript; compensated by mandatory PropTypes |
-| Styling | Plain CSS | No Tailwind, no UI libraries |
-| Data Fetching | Fetch API only | No Axios |
-| Type Safety | PropTypes (required on all components) | Replaces TypeScript; catches prop contract violations at runtime in dev |
-| Dependencies | No new packages without explicit team approval | Minimises supply-chain attack surface |
+| Framework | React 18 (JavaScript) | No TypeScript — compensated by mandatory PropTypes |
+| Build | Vite 8 | HMR, ESM-native |
+| Styling | Plain CSS | No Tailwind, no UI component libraries |
+| HTTP Client | Axios | Centralized via `src/api/apiClient.js` |
+| Routing | React Router v6 | Client-side SPA routing |
+| Type Safety | PropTypes | Required on every exported component |
+| 3D / Visual | React Three Fiber, Three.js | Used in theme layer and Verisphere |
+| Testing | Vitest + Testing Library (unit/integration), Playwright (E2E) |
+| Icons | Lucide React | No other icon libraries |
+
+**Dependency rule:** No new packages without explicit approval. Check bundle size impact first.
 
 ---
 
@@ -18,27 +27,65 @@
 
 ```
 frontend/src/
-  ├── api/              ← All fetch calls and config.js. Never fetch inside components.
-  ├── components/       ← Shared/reusable UI (Buttons, Modals, Inputs)
-  ├── hooks/            ← Global custom hooks
-  ├── pages/            ← Page orchestrators (organised as folders)
-  │   └── <PageName>/
-  │       ├── <PageName>.jsx           ← Main orchestrator, < 150 lines
-  │       └── <PageName><Section>.jsx  ← Extracted sub-components
-  ├── errors/           ← ErrorBoundary components and fallback UIs
-  ├── styles/           ← Global CSS variables and resets
-  ├── utils/            ← Pure helper functions (formatters, validators)
-  └── assets/           ← Images, SVGs, static media
+├── api/                  ← All HTTP calls. Never fetch inside components.
+│   ├── apiClient.js      ← Axios instance (base URL, interceptors, timeout)
+│   ├── config.js         ← API_BASE from env
+│   ├── blogApi.js
+│   ├── portfolioApi.js
+│   ├── projectApi.js
+│   ├── productApi.js
+│   ├── paymentApi.js
+│   ├── userApi.js
+│   ├── orderApi.js
+│   └── coreApi.js
+│
+├── components/           ← Truly global UI only (AuthModal, SEO, ScrollToTop)
+│
+├── hooks/                ← Global custom hooks (useAuth, useThemeContext, etc.)
+│
+├── data/                 ← Static data files (skillsData, merchandiseData, legacyLinks)
+│
+├── errors/               ← Error boundary components
+│
+├── theme/                ← Seasonal theme engine (ThemeLayer, ThemeParticles, ThemeEngine, ThreeVisual)
+│
+├── Home/                 ← Landing page
+│   ├── Home.jsx          ← Orchestrator (< 150 lines)
+│   ├── Home.css
+│   ├── components/       ← Home-specific: TopNavBar, HomeHero, CapabilitiesCarousel,
+│   │                        ContributionsSection, SpotlightSection, MerchandiseSection,
+│   │                        HomeFooter, WelcomeOverlay, SkillModal, ContactModal
+│   └── templates/        ← Design variant reference files (Classic, Editorial, Minimal)
+│
+├── Projects/             ← Self-contained sub-applications
+│   ├── Classroom/        ← Spatial Learning Environment (interactive slides, quizzes, SCORM)
+│   ├── Verisphere/       ← Community platform (posts, comments, reactions, dark/light mode)
+│   ├── Merchandise/      ← E-commerce (ShopPage, CartDrawer, ProductGrid, ProductModal, CheckoutPage)
+│   └── Synapse_Assessments/ ← Credentials and assessment hub
+│
+├── tests/                ← Vitest tests
+│   ├── unit/             ← API layer, hooks, pure components
+│   └── integration/      ← Page-level flows with mocked APIs
+│
+├── assets/               ← Images, SVGs
+├── App.jsx               ← Root router and layout shell
+├── main.jsx              ← Entry point
+└── index.css             ← Global reset only
 ```
+
+**Modularity principle:** Each project in `Projects/` is self-contained with its own components, pages, styles, and context. Shared code lives in `src/api/`, `src/hooks/`, `src/components/`, or `src/theme/`. No cross-project imports between projects.
 
 ---
 
 ## 3. Coding Standards
 
-### 3.1 File Density
+### 3.1 File Size
 
-- **Hard limit**: No file exceeds 150 lines. Extract immediately on breach.
-- Components: prefer under 100 lines. Composition over nesting.
+| Rule | Limit |
+|---|---|
+| Hard maximum | 150 lines per file |
+| Preferred | Under 100 lines |
+| Breach action | Extract immediately — do not merge over-limit files |
 
 ### 3.2 Naming Conventions
 
@@ -49,19 +96,22 @@ frontend/src/
 | Boolean variable | `bool<Name>` | `boolIsLoading` |
 | Array variable | `arr<Name>` | `arrProductList` |
 | Object variable | `obj<Name>` | `objUserProfile` |
-| State variable | `<prefix><Name>State` | `arrItemsState` |
-| API functions | `<verb><Resource>` | `fetchProductList()` |
+| State variable | `<prefix><Name>State` | `arrItemsState`, `boolIsLoadingState` |
+| API functions | `<verb><Resource>` | `fetchProductList()`, `postCreateOrder()` |
 | Event handlers | `handle<Event>` | `handleFormSubmit()` |
-| Components | `<NameType>.jsx` | `ProductCard.jsx` |
+| Component files | `PascalCase.jsx` | `ProductCard.jsx` |
+| CSS classes | `ath-<element>` | `ath-hero-title`, `ath-nav-link` |
 
 ### 3.3 Props
 
-- Descriptive, no abbreviations: `productId`, not `pid`.
-- **PropTypes required on every component**. Missing PropTypes is a lint error.
+- Descriptive names, no abbreviations: `productId`, not `pid`.
+- **PropTypes required on every exported component.** Missing PropTypes is a blocking issue.
 
-### 3.4 Code Splitting
+### 3.4 Imports
 
-Route-level splitting required: `React.lazy()` + `Suspense` for each page folder.
+- No dead imports. ESLint `no-unused-vars` is enforced.
+- No commented-out code. Git history is the archive.
+- No `console.log` in committed code.
 
 ---
 
@@ -69,64 +119,42 @@ Route-level splitting required: `React.lazy()` + `Suspense` for each page folder
 
 ### 4.1 API Isolation
 
-- All fetch calls live exclusively in `src/api/`.
-- Components call API functions; they never call `fetch` directly.
-- Every API function must include a `try/catch` block and return a normalised `{ data, error }` shape.
+All HTTP calls live in `src/api/`. Components never call `fetch` or `axios` directly.
+
+Every API function must include a `try/catch` block and return a normalized shape:
 
 ```js
-// src/api/products.js
-export async function fetchProductList() {
+// Standard pattern
+export const fetchResourceList = async () => {
   try {
-    const response = await fetch(`${API_BASE_URL}/products`, {
-      credentials: 'include', // send httpOnly cookies
-    });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const data = await response.json();
+    const data = await apiClient.get('/resource/');
     return { data, error: null };
-  } catch (err) {
-    return { data: null, error: err.message };
+  } catch (error) {
+    return { data: null, error: error.message || "Failed to fetch" };
   }
-}
+};
 ```
 
 ### 4.2 State Management
 
-- Prefer `useState` and `useContext` (React native).
-- Server state pattern: loading / data / error triad in every data-fetching hook.
-- Promote to a dedicated state solution only with explicit team decision and justification documented.
+- `useState` and `useContext` only. No Redux, Zustand, or external state libraries.
+- Server state: loading / data / error triad in every data-fetching component.
 
-### 4.3 Error Handling — Two Layers
+### 4.3 Error Handling
 
-**Layer 1 — API errors** (network, HTTP 4xx/5xx): caught in `src/api/`, surfaced via `strErrorMsgState` in the relevant component.
+**Layer 1 — API errors:** Caught in `src/api/`, surfaced via error state in components.
 
-**Layer 2 — Render errors** (unexpected JS exceptions): caught by `ErrorBoundary` components. Every page-level component must be wrapped by an `ErrorBoundary` with a fallback UI.
+**Layer 2 — Render errors:** Caught by `PageErrorBoundary`. Every page-level route in `App.jsx` must be wrapped by an error boundary.
 
-```jsx
-// src/errors/PageErrorBoundary.jsx
-class PageErrorBoundary extends React.Component {
-  state = { boolHasError: false };
+### 4.4 Component Ownership
 
-  static getDerivedStateFromError() {
-    return { boolHasError: true };
-  }
+| Location | Contains | Rule |
+|---|---|---|
+| `src/components/` | AuthModal, SEO, ScrollToTop | Truly global — used across multiple pages/projects |
+| `Home/components/` | TopNavBar, HomeHero, ContactModal, SkillModal, etc. | Home-page specific — not imported by projects |
+| `Projects/<Name>/components/` | Project-specific UI | Never imported outside that project |
 
-  componentDidCatch(error, info) {
-    logErrorToMonitoring(error, info); // Sentry or equivalent
-  }
-
-  render() {
-    if (this.state.boolHasError) return <ErrorFallback />;
-    return this.props.children;
-  }
-}
-```
-
-### 4.4 Configuration
-
-- Constants (base URLs, magic numbers, feature flags) in `src/api/config.js`.
-- Environment variables via `REACT_APP_` prefix.
-- **Document every `REACT_APP_` variable in `.env.example`** with a comment marking it as safe-for-client or restricted.
-- Never place secrets, private keys, or service credentials in client code. These are visible in the compiled bundle.
+If a component is imported by only one page/project, it belongs in that page/project's folder.
 
 ---
 
@@ -134,466 +162,153 @@ class PageErrorBoundary extends React.Component {
 
 ### 5.1 XSS Prevention
 
-- `dangerouslySetInnerHTML` is **banned by default**.
-- If raw HTML rendering is unavoidable (e.g., CMS content), require: `DOMPurify.sanitize()` wrapping the content, a code-review exception comment, and a second reviewer sign-off on the PR.
+`dangerouslySetInnerHTML` requires sanitization. Every usage must wrap content with `DOMPurify.sanitize()`.
 
-```jsx
-// Banned — no exceptions without the above process
-<div dangerouslySetInnerHTML={{ __html: userContent }} />
-
-// Correct if raw HTML is truly required
-import DOMPurify from 'dompurify';
-<div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(userContent) }} />
-```
+**Known debt:** `CapabilitiesCarousel.jsx` and `SkillModal.jsx` render `strIconSvg` from the database without sanitization. Classroom slide components render markdown-parsed HTML without sanitization. These must be addressed.
 
 ### 5.2 Authentication & Token Storage
 
-- Auth tokens must **never** be stored in `localStorage` or `sessionStorage`. Both are accessible to any JavaScript on the page and are vulnerable to XSS exfiltration.
-- Auth tokens must be stored in `httpOnly`, `Secure`, `SameSite=Strict` cookies, managed server-side.
-- API calls use `credentials: 'include'` to send cookies automatically.
+**Current state:** Auth tokens are stored in `localStorage` via `useAuth.js`. This is a known security debt — `localStorage` is vulnerable to XSS exfiltration.
 
-### 5.3 Dependency Auditing
+**Target state:** `httpOnly`, `Secure`, `SameSite=Strict` cookies managed server-side. API calls use `credentials: 'include'`.
 
-- `npm audit --audit-level=high` runs in CI on every push.
-- PRs are blocked from merging if high or critical severity vulnerabilities are found.
-- Run `npm audit` locally before every push.
+### 5.3 Environment Variables
 
-### 5.4 Content Security Policy
+- Vite exposes variables prefixed with `VITE_` to the client bundle. Never put secrets in `VITE_*` variables.
+- `src/api/config.js` reads `VITE_API_BASE` with fallback to `/api`.
 
-- CSP headers are enforced at the infrastructure layer (CDN / reverse proxy), not in React.
-- The frontend must not inline scripts or use `eval()`. Doing so breaks a standard CSP and signals a design flaw.
+### 5.4 Dependency Auditing
 
-### 5.5 Sensitive Data in Logs
-
-- Never log auth tokens, passwords, PII (names, emails, IDs), or API keys to `console`, error trackers, or analytics.
-- Error monitoring payloads must be reviewed to confirm no sensitive data is captured in breadcrumbs or request bodies.
+- `npm audit --audit-level=high` before every push.
+- No merge with high or critical CVEs unresolved.
 
 ---
 
 ## 6. Accessibility (WCAG 2.1 AA)
 
-Accessibility is a correctness requirement, not a polish step. Violations are a legal liability (ADA; EU EAA 2025).
+Accessibility is a correctness requirement, not polish.
 
-### 6.1 Structural Requirements
-
-- Semantic HTML elements used correctly (`<button>` for actions, `<a>` for navigation, `<nav>`, `<main>`, `<header>`, landmark roles).
-- All images have meaningful `alt` text. Decorative images use `alt=""`.
-- Heading hierarchy is logical and unbroken (`h1` → `h2` → `h3`; no skipping).
-- Colour contrast: ≥ 4.5:1 for body text, ≥ 3:1 for large text and UI components.
-
-### 6.2 Interaction Requirements
-
-- All interactive elements (buttons, links, inputs, modals) are fully keyboard-navigable.
-- Visible focus indicators on all focusable elements (no `outline: none` without a custom replacement).
-- Focus is managed programmatically on route changes and modal open/close.
-- ARIA attributes used only when native semantics are insufficient; incorrect ARIA is worse than none.
-
-### 6.3 Enforcement
-
-- `jest-axe` integrated into component tests. Any `axe` violation fails the test.
-- Colour contrast verified in design review before implementation.
-- Manual keyboard-only walkthrough required before marking a feature as done.
-
-```jsx
-// Example: accessibility test in a component test file
-import { axe, toHaveNoViolations } from 'jest-axe';
-expect.extend(toHaveNoViolations);
-
-test('ProductCard has no accessibility violations', async () => {
-  const { container } = render(<ProductCard productId="1" productName="Widget" />);
-  const results = await axe(container);
-  expect(results).toHaveNoViolations();
-});
-```
+- Semantic HTML: `<button>` for actions, `<a>` for navigation, `<nav>`, `<main>`, `<header>`.
+- All images: meaningful `alt` text. Decorative images: `alt=""`.
+- Heading hierarchy: logical and unbroken (`h1` → `h2` → `h3`).
+- Colour contrast: 4.5:1 body text, 3:1 large text and UI components.
+- All interactive elements: fully keyboard-navigable.
+- Visible focus indicators on all focusable elements.
+- `prefers-reduced-motion` respected in all CSS animations.
 
 ---
 
 ## 7. Performance
 
-### 7.1 Core Web Vitals Targets
+| Metric | Target |
+|---|---|
+| LCP (Largest Contentful Paint) | ≤ 2.5s |
+| CLS (Cumulative Layout Shift) | ≤ 0.1 |
+| INP (Interaction to Next Paint) | ≤ 200ms |
 
-| Metric | Target | Definition |
-|---|---|---|
-| LCP (Largest Contentful Paint) | ≤ 2.5 s | Perceived load speed |
-| CLS (Cumulative Layout Shift) | ≤ 0.1 | Visual stability |
-| INP (Interaction to Next Paint) | ≤ 200 ms | Responsiveness |
-
-### 7.2 Bundle Discipline
-
-- Route-level code splitting is mandatory (see §3.4).
-- Run `source-map-explorer` or `webpack-bundle-analyzer` before every significant release.
+- Route-level code splitting via `React.lazy()` + `Suspense` is the target architecture for `App.jsx`.
 - No dependency added without checking its minified + gzipped size cost.
 
-### 7.3 Lighthouse CI
-
-- Lighthouse CI runs in the CI pipeline on every PR.
-- PRs fail if LCP > 2.5 s or CLS > 0.1 on the test deployment.
-
 ---
 
-## 8. Observability & Error Monitoring
+## 8. Testing
 
-- A production error monitoring service (e.g., Sentry) is initialised at the application root before the React tree mounts.
-- `ErrorBoundary.componentDidCatch` forwards errors to the monitoring service.
-- Unhandled promise rejections are captured globally.
-- Monitoring is configured to **scrub PII** from payloads before transmission.
-- Alerts are configured for error rate spikes; `console.error` is not a substitute for monitoring.
-
----
-
-## 9. Testing Strategy
-
-### 9.1 Test Pyramid
+### 8.1 Test Pyramid
 
 ```
-           ┌──────────┐
-           │   E2E    │  Few — Playwright. Critical user journeys only.
-          ┌┴──────────┴┐
-          │Integration │  Some — React Testing Library + MSW. Page-level flows.
-         ┌┴────────────┴┐
-         │  Unit Tests  │  Many — Vitest/Jest. utils/, hooks/, pure logic.
-        ┌┴──────────────┴┐
-        │  A11y + Visual │  All components — jest-axe; optional Chromatic.
-        └────────────────┘
+         ┌──────────┐
+         │   E2E    │  Playwright — critical user journeys (tests/e2e/)
+        ┌┴──────────┴┐
+        │Integration │  Testing Library — page-level flows (src/tests/integration/)
+       ┌┴────────────┴┐
+       │  Unit Tests  │  Vitest — API layer, hooks, pure logic (src/tests/unit/)
+       └──────────────┘
 ```
 
-### 9.2 Coverage Targets
+### 8.2 Coverage Targets
 
 | Layer | Target | Scope |
 |---|---|---|
-| Unit | ≥ 80% | `src/utils/`, `src/hooks/` |
-| Integration | Key flows | Page-level happy path + error path |
-| E2E | Critical journeys | Auth, conversion, error recovery |
-| Accessibility | Zero violations | All components |
+| Unit | ≥ 80% | `src/api/`, `src/hooks/` |
+| Integration | Key flows | Page happy path + error path |
+| E2E | Critical journeys | Home load, shop flow, auth modal, navigation |
 
-### 9.3 Test Placement
+### 8.3 Placement
 
-Co-locate tests: `ProductCard.test.jsx` beside `ProductCard.jsx`. E2E tests in `e2e/`.
+Unit and integration tests live in `src/tests/`. E2E tests live in `tests/e2e/`. These are separate test runners (Vitest vs Playwright) and must not be mixed.
 
-### 9.4 Mocking Policy
+### 8.4 Mocking
 
-Mock at network layer with MSW. Never mock component under test.
-
-### 9.5 What to Test
-
-Test: business flows, error states, hooks, utils + edge cases, component a11y.
-Skip: React internals, trivial pass-through props.
+Mock at network/module level. Never mock the component under test.
 
 ---
 
-## 10. CI/CD Pipeline
+## 9. Styling Guidelines
 
-Every push to any branch triggers the full pipeline. PRs cannot be merged without a green pipeline.
-
-```
-Step 1 — Lint
-  eslint --max-warnings 0
-  (Zero warnings tolerated; warnings are errors.)
-
-Step 2 — Dependency Audit
-  npm audit --audit-level=high
-  (Fail on high or critical CVEs.)
-
-Step 3 — Unit & Integration Tests
-  npm run test -- --coverage
-  (Fail if coverage drops below targets in §9.2.)
-
-Step 4 — Accessibility Tests
-  Included in Step 3 via jest-axe.
-
-Step 5 — Build
-  npm run build
-  (Fail on any build error or warning.)
-
-Step 6 — Performance Audit
-  Lighthouse CI against preview deployment.
-  (Fail if LCP > 2.5s or CLS > 0.1.)
-
-Step 7 — Preview Deployment
-  Auto-deploy PR branch to a preview URL.
-  (URL posted to PR for manual QA and stakeholder review.)
-
-Step 8 — E2E Tests (on preview deployment)
-  Playwright critical-journey suite.
-  (Fail if any critical journey fails.)
-```
-
-**Branch protection rules:**
-- `main` and `develop` are protected branches.
-- Direct push is blocked; all changes via PR.
-- Minimum one code-review approval required.
-- Pipeline must be green before merge is permitted.
+- Custom, intentional aesthetic. No generic Bootstrap/Material patterns.
+- All CSS classes use the `ath-*` prefix (Scholarly Athenaeum design system).
+- CSS is co-located: each component's `.css` file lives beside its `.jsx` file.
+- No global stylesheet except `index.css` (reset only).
+- Each project in `Projects/` owns its own styles — no cross-project CSS bleeding.
+- Colour choices must satisfy WCAG 2.1 AA contrast ratios.
+- `prefers-color-scheme` considered for dark/light theming decisions.
 
 ---
 
-## 11. Development Workflow
+## 10. Template Integration Protocol
 
-### 11.1 Before Every Commit
+When merging external design templates (HTML/CSS from Figma, AI tools, or premade templates):
 
-```bash
-eslint src/          # zero warnings
-npm run test         # all tests green
-npm audit            # no high/critical
-```
+1. **Business content is sacred.** All user-facing text, messaging, and copy must be preserved exactly. Templates change presentation, never content.
+2. **One component per commit.** Migrate one component at a time, test after each.
+3. **Delete old only after new is verified.** Never delete v1 patterns until all v2 migrations are complete and tested.
+4. **CSS scoping.** New templates must use the `ath-*` prefix or CSS modules. No global class pollution.
+5. **Reference templates** live in `Home/templates/` as static HTML for comparison — they are not imported into the React tree.
 
-### 11.2 Before Every PR
+See `docs/TEMPLATE_ARCHITECTURE.md` for the full business ↔ presentation isolation protocol.
 
-- Manual keyboard-only walkthrough of changed UI.
-- Confirm no PII, tokens, or secrets appear in changed files.
-- Confirm PropTypes are defined on any new component.
-- Run Lighthouse locally if performance-sensitive code changed.
+---
 
-### 11.3 Commit Messages
+## 11. Agent Rules (AI-Assisted Development)
 
-Follow Conventional Commits format for automated changelog generation:
+These rules apply to any AI agent (Claude, Copilot, or other) working in this codebase:
+
+1. **Read this file and `backend/AI.md` before any refactoring or structural change.**
+2. **Show a file-level plan before changing multiple files.** Get confirmation.
+3. **Never install packages without explicit confirmation.**
+4. **Never delete files without confirmation.**
+5. **Flag security violations on sight:** `dangerouslySetInnerHTML` without sanitization, tokens in localStorage, `eval()`, hardcoded secrets.
+6. **Flag naming convention violations** in any file you touch. Fix in the same change.
+7. **Flag files exceeding 150 lines** in any file you touch. Extract in the same change.
+8. **Verify build passes** after any structural refactoring (`npm run build`).
+9. **Run tests** after any logic change (`npm run test`).
+10. **Prefer clarity over cleverness.** Optimize for the next engineer reading the code.
+
+---
+
+## 12. Commit Messages
+
+Follow Conventional Commits:
 
 ```
 feat(cart): add quantity selector to CartItem
-fix(auth): clear token cookie on session expiry
-refactor(homepage): delete v1 and v2 page components and dead assets
+fix(auth): clear token on session expiry
+refactor(home): extract hero section to separate component
 chore(deps): update react to 18.3.1
 ```
 
 ---
 
-## 12. Agent Behaviour (AI-assisted Development)
-
-- **Planning**: Show a file-level plan before changing multiple files.
-- **Safety**: Never install packages without explicit confirmation. Never delete files without confirmation.
-- **Readability**: Prefer clarity over cleverness; optimise for the next engineer reading the code.
-- **Security**: Flag any pattern that resembles `dangerouslySetInnerHTML`, token storage in localStorage, or `eval()` — even if found in existing code.
-- **Accessibility**: Add `jest-axe` assertions to every new component test file automatically.
-- **Cleanup**: When touching a file, flag any violation from §13–§15 in the same response. Do not silently leave known debt.
-
----
-
-## 13. Styling & Aesthetic Guidelines
-
-- Custom, intentional aesthetic. No generic defaults or templated AI-style patterns.
-- Emojis: minimal usage. Universally understood emojis only where strictly necessary.
-- All colour choices must satisfy WCAG 2.1 AA contrast ratios before implementation.
-- `prefers-reduced-motion` respected in all CSS animations and transitions.
-- `prefers-color-scheme` considered for any dark/light theming decisions.
-
----
-
-## 14. Quick Reference — What Goes Where
-
-| Concern | Location | Rule |
-|---|---|---|
-| Fetch calls | `src/api/` | Only place; `try/catch` always; `credentials: 'include'` |
-| Constants / URLs | `src/api/config.js` | No magic strings in components |
-| Shared UI | `src/components/` | PropTypes required; jest-axe in test |
-| Custom hooks | `src/hooks/` | ≥ 80% test coverage |
-| Pure functions | `src/utils/` | ≥ 80% test coverage; no side effects |
-| Shared prop shapes | `src/utils/propShapes.js` | One definition; imported by all consumers |
-| Page layout | `src/pages/<Name>/` | Wrapped in `PageErrorBoundary`; lazy-loaded |
-| Error boundaries | `src/errors/` | One per page; forwards to monitoring |
-| Global styles | `src/styles/` | CSS variables; no inline styles for theming |
-
----
-
-## 15. Refactoring Philosophy
-
-Refactoring is not a separate activity scheduled "later." It is the discipline of
-leaving every file you touch in a cleaner state than you found it.
-
-**The Boy Scout Rule**: Before submitting any PR, scan the files you touched.
-If you see a violation listed in §16–§18, fix it in the same PR — not a follow-up ticket.
-
-**Scope discipline**: Refactors that touch more than 5 files must be their own
-dedicated PR, separate from feature work. Mixing refactor and feature changes makes
-both harder to review and harder to revert.
-
----
-
-## 16. Design Iteration Debt — Multiple Homepage Versions
-
-This codebase has accumulated dead code from multiple homepage design iterations.
-The following rules govern how to identify and eliminate it permanently.
-
-### 16.1 Dead Page Components
-
-Any page component not reachable from the active router is dead code.
-Dead pages must be **deleted**, not commented out or renamed to `_old`.
-
-**Audit process:**
-1. Open the router file (`App.jsx` or `router.jsx`).
-2. List every `<Route>` path currently defined.
-3. List every folder in `src/pages/`.
-4. Any folder not referenced in the active route list is dead — delete it.
-
-```bash
-# List all page folders
-ls src/pages/
-
-# Cross-reference with router imports
-grep -r "import" src/App.jsx | grep "pages"
-```
-
-### 16.2 Dead CSS
-
-Multiple design iterations accumulate CSS that no element references.
-
-| Category | Detection Method |
-|---|---|
-| Entire CSS files not imported anywhere | `grep -r "import.*\.css" src/` — any `.css` absent from results is dead |
-| CSS class names not used in JSX | IDE "find usages" on the class name; zero results = dead |
-| Duplicate `--variable-name` definitions | Scan `src/styles/` for the same custom property defined more than once |
-| Rules overridden in the same file | Two selectors targeting the same element with the same property |
-| Redundant vendor prefixes | `-webkit-`, `-moz-` for properties now universally supported |
-
-**Rule**: Do not accumulate commented-out CSS blocks. If a style is removed, delete it.
-Git history preserves it if needed.
-
-### 16.3 Dead Assets
-
-```bash
-# List all assets
-find src/assets/ -type f
-
-# Check each against the codebase — zero results means dead
-grep -r "hero-v2.png" src/
-```
-
-Old hero images, alternate logo variants, and unused icon sets from previous design iterations
-are among the largest files in the repository. Delete them as soon as they are superseded.
-
-### 16.4 Dead Components
-
-Any component in `src/components/` not imported elsewhere is dead. Delete on sight.
-
-### 16.5 Duplicate Utility Functions
-
-Multiple iterations often produce near-identical utility functions (e.g., two `formatDate`
-implementations in different files).
-
-**Rule**: One utility function per logical operation. If two functions do the same thing,
-keep the one with tests and delete the other. Update all call sites before closing the PR.
-
----
-
-## 17. Code-Level Refactoring Rules
-
-### 17.1 No Commented-Out Code
-
-Commented-out code is prohibited in any committed file.
-
-```jsx
-// BANNED
-{/* <OldHeroSection backgroundImage={strOldHero} /> */}
-
-// BANNED
-// const strOldApiUrl = 'https://old-endpoint.example.com/api';
-```
-
-**Only permitted exception**: A `TODO:` or `FIXME:` with a ticket number and owner.
-```js
-// TODO(#142): Replace polling with WebSocket when backend supports it — @yourname
-```
-
-### 17.2 No Magic Numbers or Strings
-
-All non-obvious literals must be named constants in `config.js`.
-
-### 17.3 No Business Logic in Components
-
-Components render and handle events only. Move data transform, formatting, decisions to `src/utils/` or hooks.
-
-### 17.4 Single Source of Truth for Prop Shapes
-
-Do not redefine the same PropTypes shape in multiple components.
-Extract it to `src/utils/propShapes.js` when more than one component uses it.
-
-```js
-// src/utils/propShapes.js
-import PropTypes from 'prop-types';
-
-export const productShape = PropTypes.shape({
-  productId: PropTypes.string.isRequired,
-  productName: PropTypes.string.isRequired,
-  numPrice: PropTypes.number.isRequired,
-});
-```
-
-### 17.5 No Dead Imports
-
-No unused import statements in any file. ESLint `no-unused-vars` catches these;
-zero warnings policy in CI means they are blocked from merging.
-
-### 17.6 No console.log in Production Paths
-
-Remove all `console.log`, `console.warn`, `console.error` before committing. Use error monitoring service.
-
----
-
-## 18. Refactoring Workflow
-
-### 18.1 Scheduled Cleanup Sprint
-
-Once per development cycle (every 4–6 feature sprints), run a dedicated cleanup sprint
-with no feature work. Agenda:
-
-1. Dead page audit — §16.1.
-2. Dead component audit — §16.4.
-3. Dead asset audit — §16.3.
-4. Dead CSS audit — §16.2.
-5. Duplicate utility function audit — §16.5.
-6. `package.json` unused dependency audit — `npx depcheck`.
-
-Document findings as a list of small, independently reviewable cleanup PRs.
-
-### 18.2 Refactor PR Rules
-
-A PR whose primary purpose is refactoring must:
-- Use `refactor:` Conventional Commit prefix.
-- Not change any user-visible behaviour.
-- Include a "before / after" summary in the PR description.
-- Pass all existing tests without modifying test assertions.
-  If test assertions must change, the refactor changed behaviour — stop and reassess.
-
-### 18.3 When to Refactor vs. Dedicated PR
-
-| Signal | Action |
-|---|---|
-| File exceeds 150 lines | Extract immediately, same PR |
-| Function does more than one thing | Extract now if it blocks understanding |
-| Naming violates convention | Rename in same PR using IDE rename tool |
-| Logic duplicated in 2 places | Extract to shared util before adding a third |
-| Logic duplicated in 3+ places | Dedicated refactor PR before any further feature work |
-| Page replaced by a new design | Delete old page folder in the same PR that ships the new one |
-
----
-
-## 19. Definition of Done — Frontend
-
-A task is only done when all of the following are true:
-
-- [ ] No file in the changeset exceeds 150 lines.
-- [ ] All new components have PropTypes defined.
-- [ ] All new components have a `jest-axe` assertion in their test file.
-- [ ] No commented-out code in the changeset.
-- [ ] No dead imports — ESLint passes with zero warnings.
-- [ ] No `console.log` / `console.warn` / `console.error` in production paths.
-- [ ] Every CSS class introduced is used in JSX within the same PR.
-- [ ] No magic numbers or strings — all literals are named constants.
-- [ ] Old page / component / asset deleted if replaced by this PR.
-- [ ] CI pipeline is fully green (lint → audit → test → build → Lighthouse → E2E).
-
-Analyze my codebase and create a markdown summary. Here are the stats:
-
-**Codebase Statistics:**
-- Total lines of code: 11,920 (JS/JSX/TS/TSX)
-- Total size: 486.96 MB
-- JavaScript files: 7,927
-- TypeScript/TSX files: 3
-- Location: C:\Users\Vivek\projects\sle
-
-Create a markdown file (.md) that includes:
-1. **Codebase Overview** - Brief description of the project scope based on these numbers
-2. **Size Breakdown** - Visual representation of the stats (you can use a simple table or formatted text)
-3. **Model Recommendation** - Which Claude model to use for different tasks (Haiku for small edits, Sonnet for complex work)
-4. **Command Reference** - The PowerShell commands I can reuse to check codebase size monthly
-5. **Tracking** - A template for logging codebase growth over time
-
-Make it scannable and practical—something I can reference quickly.
+## 13. Definition of Done
+
+A task is complete when:
+
+- [ ] No file exceeds 150 lines
+- [ ] All new components have PropTypes
+- [ ] No commented-out code
+- [ ] No dead imports
+- [ ] No `console.log` in production paths
+- [ ] Every new CSS class is used in JSX
+- [ ] Old files deleted if replaced
+- [ ] Build passes: `npm run build`
+- [ ] Tests pass: `npm run test`
